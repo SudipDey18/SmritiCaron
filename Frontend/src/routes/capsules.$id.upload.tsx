@@ -1,15 +1,10 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useQueryClient } from "@tanstack/react-query";
-import { useRef, useState } from "react";
-import { FileText, Headphones, Image as ImageIcon, UploadCloud, Video } from "lucide-react";
+import { createFileRoute } from "@tanstack/react-router";
+import { useState } from "react";
+import { FileText, Headphones, Image as ImageIcon, UploadCloud, Video, X } from "lucide-react";
 
 import { CapsuleTabs } from "./capsules.$id";
 import { ActionButton, Field, PageHeader, Panel } from "@/components/Bits";
-import { UploadQueue, type QueueItem } from "@/components/common/UploadQueue";
 import { AppShell } from "@/components/layout/AppShell";
-import { ApiError } from "@/lib/api/client";
-import { uploadsApi } from "@/lib/api/endpoints";
-import { qk } from "@/lib/api/hooks";
 import { useLang } from "@/lib/i18n";
 
 export const Route = createFileRoute("/capsules/$id/upload")({
@@ -30,123 +25,18 @@ export const Route = createFileRoute("/capsules/$id/upload")({
   component: UploadPage,
 });
 
-const MAX_BYTES = 200 * 1024 * 1024;
-
-function humanSize(bytes: number) {
-  if (bytes < 1024) return `${bytes} B`;
-  const units = ["KB", "MB", "GB"];
-  let val = bytes / 1024;
-  let i = 0;
-  while (val >= 1024 && i < units.length - 1) {
-    val /= 1024;
-    i += 1;
-  }
-  return `${val.toFixed(1)} ${units[i]}`;
-}
-
-type PendingFile = { id: string; file: File };
+const emotions = ["joy", "nostalgia", "love", "sadness", "pride"] as const;
 
 function UploadPage() {
   const { id } = Route.useParams();
   const { t, lang } = useLang();
-  const navigate = useNavigate();
-  const qc = useQueryClient();
   const [over, setOver] = useState(false);
-  const [pending, setPending] = useState<PendingFile[]>([]);
-  const [queue, setQueue] = useState<QueueItem[]>([]);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [title, setTitle] = useState("");
-  const [date, setDate] = useState("");
-  const [location, setLocation] = useState("");
-  const [description, setDescription] = useState("");
-  const inputRef = useRef<HTMLInputElement | null>(null);
-
-  const addFiles = (list: FileList | File[]) => {
-    const files = Array.from(list);
-    const accepted: PendingFile[] = [];
-    const rejected: string[] = [];
-    for (const file of files) {
-      if (file.size > MAX_BYTES) {
-        rejected.push(file.name);
-      } else {
-        accepted.push({ id: crypto.randomUUID(), file });
-      }
-    }
-    if (rejected.length > 0) {
-      setError(`${rejected.join(", ")} — ${lang === "bn" ? "সর্বোচ্চ ২০০ মেগাবাইট" : "exceeds the 200MB limit"}`);
-    }
-    if (accepted.length > 0) {
-      setPending((prev) => [...prev, ...accepted]);
-      setQueue((prev) => [
-        ...prev,
-        ...accepted.map(({ id: fid, file }) => ({
-          id: fid,
-          file: file.name,
-          size: humanSize(file.size),
-          kind: "caption" as const,
-          state: "pending" as const,
-          progress: 0,
-        })),
-      ]);
-    }
-  };
-
-  const uploadOne = async ({ id: fid, file }: PendingFile) => {
-    setQueue((q) => q.map((x) => (x.id === fid ? { ...x, state: "processing", progress: 40 } : x)));
-    try {
-      await uploadsApi.single(id, file, {
-        title: title || undefined,
-        description: description || undefined,
-        memoryDate: date || undefined,
-      });
-      setQueue((q) => q.map((x) => (x.id === fid ? { ...x, state: "completed", progress: 100 } : x)));
-      return true;
-    } catch (err) {
-      const message = err instanceof ApiError ? err.message : t("errorTitle");
-      setQueue((q) => q.map((x) => (x.id === fid ? { ...x, state: "failed", progress: 0 } : x)));
-      setError(message);
-      return false;
-    }
-  };
-
-  const submit = async () => {
-    if (pending.length === 0) {
-      setError(lang === "bn" ? "অন্তত একটি ফাইল বেছে নিন" : "Choose at least one file");
-      return;
-    }
-    setError(null);
-    setSubmitting(true);
-    let anySuccess = false;
-    for (const item of pending) {
-      const ok = await uploadOne(item);
-      if (ok) anySuccess = true;
-    }
-    setSubmitting(false);
-    setPending([]);
-    if (anySuccess) {
-      void qc.invalidateQueries({ queryKey: ["memories", id] });
-      void qc.invalidateQueries({ queryKey: qk.timeline(id) });
-      void qc.invalidateQueries({ queryKey: qk.dashboard });
-      void navigate({ to: "/capsules/$id/memories", params: { id } });
-    }
-  };
-
-  const retry = (fid: string) => {
-    const item = pending.find((p) => p.id === fid);
-    const fromQueue = queue.find((q) => q.id === fid);
-    if (item) {
-      void uploadOne(item);
-    } else if (fromQueue) {
-      // File object no longer retained after a failed batch submit; ask to re-pick.
-      setError(lang === "bn" ? "ফাইলটি আবার বেছে নিন" : "Please re-select the file to retry");
-    }
-  };
-
-  const cancel = (fid: string) => {
-    setPending((p) => p.filter((x) => x.id !== fid));
-    setQueue((q) => q.filter((x) => x.id !== fid));
-  };
+  const [emotion, setEmotion] = useState<(typeof emotions)[number]>("nostalgia");
+  const [queue, setQueue] = useState([
+    { name: "dida-1968.jpg", size: "2.4 MB", pct: 100 },
+    { name: "harmonium.m4a", size: "8.1 MB", pct: 62 },
+    { name: "chithi-scan.pdf", size: "1.2 MB", pct: 18 },
+  ]);
 
   return (
     <AppShell>
@@ -164,27 +54,13 @@ function UploadPage() {
             onDrop={(e) => {
               e.preventDefault();
               setOver(false);
-              if (e.dataTransfer.files.length) addFiles(e.dataTransfer.files);
             }}
-            onClick={() => inputRef.current?.click()}
-            role="button"
-            tabIndex={0}
-            className={`grid cursor-pointer place-items-center rounded-lg border-2 border-dashed px-6 py-14 text-center transition-all duration-500 ${
+            className={`grid place-items-center rounded-lg border-2 border-dashed px-6 py-14 text-center transition-all duration-500 ${
               over
                 ? "border-primary bg-primary/5 scale-[1.01] lamp-glow"
                 : "border-border bg-card/70"
             }`}
           >
-            <input
-              ref={inputRef}
-              type="file"
-              multiple
-              className="hidden"
-              onChange={(e) => {
-                if (e.target.files?.length) addFiles(e.target.files);
-                e.target.value = "";
-              }}
-            />
             <UploadCloud
               className={`mb-4 size-10 text-primary transition-transform duration-500 ${over ? "scale-125" : "animate-float-slow"}`}
               aria-hidden
@@ -198,55 +74,101 @@ function UploadPage() {
             </div>
           </div>
 
-          {error && (
-            <p className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive">
-              {error}
-            </p>
-          )}
-
           <Panel>
-            {queue.length === 0 ? (
-              <p className="text-sm text-muted-foreground">{t("queue")}: —</p>
-            ) : (
-              <UploadQueue items={queue} onCancel={cancel} onRetry={retry} simulate={false} />
-            )}
+            <h2 className="font-display text-xl">{t("queue")}</h2>
+            <ul className="mt-4 space-y-3">
+              {queue.map((f) => (
+                <li key={f.name} className="rounded-md border border-border bg-background/60 p-3">
+                  <div className="flex items-center justify-between gap-3 text-sm">
+                    <span className="truncate">{f.name}</span>
+                    <span className="shrink-0 text-xs text-muted-foreground">{f.size}</span>
+                    <button
+                      onClick={() => setQueue((q) => q.filter((x) => x.name !== f.name))}
+                      aria-label={t("cancel")}
+                    >
+                      <X className="size-4 text-muted-foreground transition hover:text-destructive" />
+                    </button>
+                  </div>
+                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-secondary">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-primary to-brass transition-all duration-700"
+                      style={{ width: `${f.pct}%` }}
+                    />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </Panel>
+
+          <Panel delay={80}>
+            <h2 className="font-display text-xl">{t("writeStory")}</h2>
+            <div className="mt-4 flex gap-2 border-b border-border pb-2 text-sm text-muted-foreground">
+              <span className="font-bold">B</span>
+              <span className="italic">I</span>
+              <span className="underline">U</span>
+              <span>❝</span>
+            </div>
+            <textarea
+              rows={6}
+              placeholder={
+                lang === "bn"
+                  ? "সেই দিনটার কথা লিখুন…"
+                  : "Write down how that day felt…"
+              }
+              className="mt-3 w-full resize-y rounded-md border border-input bg-background px-3 py-2 font-display text-sm leading-relaxed outline-none transition focus:border-primary focus:ring-2 focus:ring-ring/30"
+            />
           </Panel>
         </div>
 
         <Panel delay={140} className="h-fit space-y-5">
           <h2 className="font-display text-xl">{t("basicInfo")}</h2>
-          <Field label={t("title")}>
-            <input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary"
-            />
-          </Field>
+          <Field label={t("title")} />
           <Field label={t("date")}>
             <input
               type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary"
             />
           </Field>
-          <Field label={t("location")}>
-            <input
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary"
-            />
+          <Field label={t("location")} />
+          <Field label={t("tags")}>
+            <div className="flex flex-wrap gap-2 rounded-md border border-input bg-background px-3 py-2">
+              {(lang === "bn" ? ["পুজো", "শৈশব"] : ["puja", "childhood"]).map((tag) => (
+                <span
+                  key={tag}
+                  className="rounded-full bg-secondary px-2 py-0.5 text-xs text-secondary-foreground"
+                >
+                  {tag}
+                </span>
+              ))}
+              <input className="min-w-16 flex-1 bg-transparent text-sm outline-none" />
+            </div>
           </Field>
           <Field label={t("description")}>
             <textarea
               rows={3}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary"
             />
           </Field>
-          <ActionButton onClick={() => void submit()}>
-            {submitting ? t("loading") : t("submitUpload")}
+          <Field label={t("emotion")}>
+            <div className="flex flex-wrap gap-2">
+              {emotions.map((e) => (
+                <button
+                  key={e}
+                  type="button"
+                  onClick={() => setEmotion(e)}
+                  className={`rounded-full border px-3 py-1 text-xs transition-all duration-300 ${
+                    emotion === e
+                      ? "border-primary bg-primary text-primary-foreground scale-105"
+                      : "border-border text-muted-foreground hover:border-primary/40"
+                  }`}
+                >
+                  {t(e)}
+                </button>
+              ))}
+            </div>
+          </Field>
+          <ActionButton to="/capsules/$id/memories" params={{ id }}>
+            {t("submitUpload")}
           </ActionButton>
         </Panel>
       </div>

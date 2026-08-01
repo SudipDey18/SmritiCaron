@@ -4,10 +4,7 @@ import { Lock } from "lucide-react";
 import alpona from "@/assets/alpona-pattern.jpg";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { useLang } from "@/lib/i18n";
-import { mediaUrl } from "@/lib/api/client";
-import { useSharedTarget } from "@/lib/api/hooks";
-import type { Capsule, Memory } from "@/lib/api/types";
-import { SkeletonCard } from "@/components/common/LoadingSkeletons";
+import { capsules, memories } from "@/lib/mock-data";
 
 export const Route = createFileRoute("/shared/$token")({
   head: () => ({
@@ -29,18 +26,8 @@ export const Route = createFileRoute("/shared/$token")({
 
 function SharedCapsuleView() {
   const { token } = Route.useParams();
-  const { t } = useLang();
-  const { data, isLoading, error } = useSharedTarget(token);
-
-  const target = data?.target as { capsule?: Capsule; memories?: Memory[] } | Capsule | undefined;
-  const capsule =
-    target && "capsule" in (target as object)
-      ? ((target as { capsule?: Capsule }).capsule ?? null)
-      : ((target as Capsule | undefined) ?? null);
-  const memories =
-    target && "memories" in (target as object)
-      ? ((target as { memories?: Memory[] }).memories ?? [])
-      : [];
+  const { t, lang } = useLang();
+  const capsule = capsules[0]!;
 
   return (
     <div className="min-h-screen bg-background paper-grain">
@@ -63,45 +50,28 @@ function SharedCapsuleView() {
 
       <main className="relative mx-auto max-w-5xl px-5 pb-20">
         <p className="text-xs uppercase tracking-widest text-sepia">{t("sharedView")}</p>
-        <h1 className="mt-2 font-display text-4xl animate-rise">
-          {capsule?.title ?? t("sharedView")}
-        </h1>
+        <h1 className="mt-2 font-display text-4xl animate-rise">{capsule.name[lang]}</h1>
         <p className="mt-3 max-w-2xl text-sm text-muted-foreground">
-          {capsule?.description ?? ""}
+          {capsule.description[lang]}
         </p>
-        {error && (
-          <p className="mt-4 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-            {error.message}
-          </p>
-        )}
         <p className="mt-2 text-xs text-muted-foreground">#{token}</p>
         <span className="mt-4 block h-px w-28 bg-gradient-to-r from-primary via-brass to-transparent" />
 
         <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {isLoading && [0, 1, 2].map((i) => <SkeletonCard key={i} delay={i * 80} />)}
           {memories.map((m, i) => (
             <article
               key={m.id}
               style={{ animationDelay: `${i * 70}ms` }}
               className="frame-photo rounded-sm animate-unfurl transition-transform duration-500 hover:-translate-y-1 hover:rotate-[0.5deg]"
             >
-              {mediaUrl(m.media?.[0]?.thumbnailUrl ?? m.media?.[0]?.url, token) ? (
-                <img
-                  src={mediaUrl(m.media?.[0]?.thumbnailUrl ?? m.media?.[0]?.url, token)}
-                  alt={m.title ?? ""}
-                  loading="lazy"
-                  className="h-32 w-full rounded-sm object-cover"
-                />
-              ) : (
-                <div className="h-32 rounded-sm bg-gradient-to-br from-secondary to-muted" />
-              )}
+              <div className="h-32 rounded-sm bg-gradient-to-br from-secondary to-muted" />
               <div className="pt-3">
-                <h2 className="font-display text-base">{m.title ?? ""}</h2>
+                <h2 className="font-display text-base">{m.title[lang]}</h2>
                 <p className="text-xs text-muted-foreground">
-                  {[m.memoryDate?.slice(0, 10), m.location].filter(Boolean).join(" · ")}
+                  {m.date} · {m.place[lang]}
                 </p>
                 <p className="mt-2 text-xs leading-relaxed text-foreground/80">
-                  {m.description ?? m.content ?? ""}
+                  {m.body[lang]}
                 </p>
               </div>
             </article>

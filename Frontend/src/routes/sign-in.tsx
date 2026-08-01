@@ -1,11 +1,8 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { Loader2 } from "lucide-react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import type { ReactNode } from "react";
 
 import alpona from "@/assets/alpona-pattern.jpg";
 import { LanguageToggle } from "@/components/LanguageToggle";
-import { ApiError } from "@/lib/api/client";
-import { useAuth } from "@/lib/auth";
 import { useLang } from "@/lib/i18n";
 
 export function AuthShell({
@@ -63,38 +60,6 @@ export const Route = createFileRoute("/sign-in")({
 
 function SignInPage() {
   const { t } = useLang();
-  const { signIn, isAuthenticated, loading } = useAuth();
-  const navigate = useNavigate();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
-
-  useEffect(() => {
-    if (!loading && isAuthenticated) void navigate({ to: "/dashboard", replace: true });
-  }, [loading, isAuthenticated, navigate]);
-
-  async function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    setError(null);
-    setFieldErrors({});
-    setSubmitting(true);
-    try {
-      await signIn(email, password);
-      void navigate({ to: "/dashboard" });
-    } catch (err) {
-      if (err instanceof ApiError) {
-        setError(err.message);
-        setFieldErrors(err.fields ?? {});
-      } else {
-        setError(t("errorTitle"));
-      }
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
   return (
     <AuthShell
       title={t("signIn")}
@@ -107,51 +72,30 @@ function SignInPage() {
         </>
       }
     >
-      <form className="space-y-4" onSubmit={onSubmit}>
-        {error && (
-          <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-            {error}
-          </p>
-        )}
-        <label className="block">
-          <span className="mb-1.5 block text-xs uppercase tracking-widest text-muted-foreground">
-            {t("email")}
-          </span>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-ring/30"
-          />
-          {fieldErrors["email"] && (
-            <span className="mt-1 block text-xs text-destructive">{fieldErrors["email"][0]}</span>
-          )}
-        </label>
-        <label className="block">
-          <span className="mb-1.5 block text-xs uppercase tracking-widest text-muted-foreground">
-            {t("password")}
-          </span>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-ring/30"
-          />
-          {fieldErrors["password"] && (
-            <span className="mt-1 block text-xs text-destructive">{fieldErrors["password"][0]}</span>
-          )}
-        </label>
-        <button
-          type="submit"
-          disabled={submitting}
-          className="flex w-full items-center justify-center gap-2 rounded-md bg-primary py-2.5 text-center text-sm font-medium text-primary-foreground transition-all hover:-translate-y-0.5 hover:lamp-glow disabled:pointer-events-none disabled:opacity-70"
-        >
-          {submitting && <Loader2 className="size-4 animate-spin" aria-hidden />}
-          {t("signIn")}
-        </button>
-      </form>
+      <label className="block">
+        <span className="mb-1.5 block text-xs uppercase tracking-widest text-muted-foreground">
+          {t("email")}
+        </span>
+        <input
+          type="email"
+          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-ring/30"
+        />
+      </label>
+      <label className="block">
+        <span className="mb-1.5 block text-xs uppercase tracking-widest text-muted-foreground">
+          {t("password")}
+        </span>
+        <input
+          type="password"
+          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-ring/30"
+        />
+      </label>
+      <Link
+        to="/dashboard"
+        className="block rounded-md bg-primary py-2.5 text-center text-sm font-medium text-primary-foreground transition-all hover:-translate-y-0.5 hover:lamp-glow"
+      >
+        {t("signIn")}
+      </Link>
     </AuthShell>
   );
 }

@@ -1,8 +1,7 @@
 import { createFileRoute, Link, Outlet } from "@tanstack/react-router";
 
-import { useCapsule as useCapsuleQuery } from "@/lib/api/hooks";
-import type { Capsule } from "@/lib/api/types";
 import { useLang, type Key } from "@/lib/i18n";
+import { capsules } from "@/lib/mock-data";
 
 export const Route = createFileRoute("/capsules/$id")({
   component: () => <Outlet />,
@@ -18,15 +17,8 @@ const tabs: { to: string; key: Key }[] = [
   { to: "/capsules/$id/legacy", key: "legacy" },
 ];
 
-/** API-backed capsule query, re-exported for other capsule sub-routes. */
-export function useCapsuleData(id: string) {
-  return useCapsuleQuery(id);
-}
-
-/** Returns the API capsule object (or undefined while loading/missing). */
-export function useCapsule(id: string): Capsule | undefined {
-  const { data } = useCapsuleQuery(id);
-  return data;
+export function useCapsule(id: string) {
+  return capsules.find((c) => c.id === id) ?? capsules[0]!;
 }
 
 export function CapsuleTabs({ id }: { id: string }) {
