@@ -150,7 +150,12 @@ function LandingPage() {
             </p>
           </div>
           <div className="absolute -bottom-8 -left-6 hidden w-40 animate-float-slow frame-photo rotate-6 rounded-sm bg-card p-2 text-center sm:block">
-            <div className="h-24 rounded-sm bg-gradient-to-br from-secondary to-muted" />
+            <img
+              src='/image.png'
+              alt={lang === "bn" ? "স্মৃতিচারণ লোগো" : "Smritocharon logo"}
+              loading="lazy"
+              className="h-24 w-full rounded-sm object-contain"
+            />
             <p className="pt-1 text-[11px] text-muted-foreground">
               {lang === "bn" ? "১৪৮টি স্মৃতি" : "148 memories"}
             </p>
