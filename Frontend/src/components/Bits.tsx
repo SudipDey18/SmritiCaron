@@ -69,18 +69,20 @@ export function ActionButton({
   children,
   variant = "solid",
   onClick,
+  disabled = false,
 }: {
   to?: string;
   params?: Record<string, string>;
   children: ReactNode;
   variant?: "solid" | "ghost";
   onClick?: () => void;
+  disabled?: boolean;
 }) {
   const cls =
     variant === "solid"
       ? "bg-primary text-primary-foreground hover:shadow-warm"
       : "border border-border bg-card text-foreground hover:border-primary/50";
-  const base = `inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-all duration-300 hover:-translate-y-0.5 ${cls}`;
+  const base = `inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-all duration-300 hover:-translate-y-0.5 ${cls} disabled:pointer-events-none disabled:opacity-60`;
 
   if (to) {
     return (
@@ -90,7 +92,7 @@ export function ActionButton({
     );
   }
   return (
-    <button type="button" onClick={onClick} className={base}>
+    <button type="button" onClick={onClick} disabled={disabled} className={base}>
       {children}
     </button>
   );

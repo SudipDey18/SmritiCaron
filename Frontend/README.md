@@ -25,18 +25,40 @@ npm run dev
 | `/capsules/:id/family` | Family tree |
 | `/capsules/:id/time-vault` | Time-locked vaults |
 | `/capsules/:id/legacy` | Legacy letters |
+| `/search` | Natural-language search + advanced filters |
+| `/notifications` | Notification centre |
+| `/activity` | Full activity log (filterable, paginated) |
 | `/profile`, `/settings` | Account & preferences |
 | `/shared/:token` | Public read-only capsule |
 
-All screens currently read from `src/lib/mock-data.ts`. Replace those reads with the API calls below.
+## Connecting to the backend
+
+Set the backend origin in `.env` (see `.env.example`) — **no trailing slash and no `/api` suffix**, because
+every endpoint path already starts with `/api`:
+
+```
+VITE_API_BASE_URL=http://localhost:4000
+```
+
+Frontend integration layer (source of truth in code):
+
+| File | Purpose |
+| --- | --- |
+| `src/lib/api/types.ts` | TypeScript models for every backend entity |
+| `src/lib/api/client.ts` | `api()` fetch wrapper: envelope unwrapping, `ApiError`, bearer tokens, transparent refresh, `mediaUrl()` |
+| `src/lib/api/endpoints.ts` | One typed function per REST endpoint, grouped per domain |
+| `src/lib/api/hooks.ts` | TanStack Query hooks + query keys (`qk`) with cache invalidation |
+| `src/lib/auth.tsx` | `AuthProvider`, `useAuth()`, `useRequireAuth()`; tokens in `localStorage` |
+
+Tokens: access + refresh are stored client-side; a `401` triggers one shared
+`POST /api/auth/refresh` attempt and the original request is replayed.
+Media paths returned by the API are resolved with `mediaUrl(path, shareToken?)`.
 
 ## API structure (backend contract)
 
-Base URL: `VITE_API_BASE_URL` (e.g. `http://localhost:5000/api`)
-
 Auth: `Authorization: Bearer <access_token>` on every request except auth and shared-link endpoints.
 Content type: `application/json` (except uploads → `multipart/form-data`).
-Every bilingual text field is an object: `{ "bn": "...", "en": "..." }`.
+
 
 ### Response envelope
 
@@ -180,9 +202,66 @@ Assistant reply:
 | GET | `/users/me/storage` | `{ used_bytes, quota_bytes }` |
 | GET | `/users/me/activity` | recent activity feed |
 
+### Notifications, activity, search & exports
+
+| Method | Endpoint | Notes |
+| --- | --- | --- |
+| GET | `/notifications?unread=true&page=1` | `{ id, kind, title, body, when, read }`; `kind` ∈ `vault_unlocked \| letter_delivered \| ai_completed \| upload_completed \| share_accepted \| error` |
+| POST | `/notifications/:id/read` | Mark one read |
+| POST | `/notifications/read-all` | Mark all read |
+| GET | `/activity?kind=upload&page=1&per_page=12` | `kind` ∈ `upload \| edit \| chat \| vault \| letter \| share` |
+| GET | `/search?q=...&type=photo&emotion=nostalgia&from=&to=` | Natural-language/semantic search; returns `{ group, id, label, sub, relevance }` |
+| GET | `/ai/jobs` | Processing queue: `{ id, file, kind: ocr\|transcript\|caption\|embedding, state: pending\|processing\|completed\|failed, progress }` |
+| POST | `/ai/jobs/:id/retry` | Retry a failed job |
+| DELETE | `/ai/jobs/:id` | Cancel a pending/processing job |
+| GET | `/capsules/:id/insights/weekly` | Weekly AI summary `{ headline, body, stats[] }` |
+| GET | `/capsules/:id/storage-series` | Monthly storage points `{ label, mb }` |
+| POST | `/capsules/:id/exports` | Body `{ format: zip\|json\|md\|pdf }` → `{ job_id }` |
+| GET | `/exports/:job_id` | `{ state, download_url }` |
+| GET/POST/DELETE | `/capsules/:id/shares` | Share links `{ token, scope, password, expires, views }` |
+
 ### Error codes
 
 `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `VALIDATION_ERROR`, `VAULT_SEALED`, `STORAGE_LIMIT`, `UNSUPPORTED_MEDIA_TYPE`, `RATE_LIMITED`, `SERVER_ERROR`.
+
+## Create-capsule wizard → API payload
+
+`/capsules/new` is fully interactive (clickable step chips, privacy chips, relation select,
+language select, AI-chat switch) and submits via `POST /api/capsules`:
+
+```json
+{
+  "title": "দিদার সিন্দুক",
+  "description": "…",
+  "privacy": "PRIVATE | FAMILY | PUBLIC",
+  "relation": "grandmother | grandfather | mother | father | uncle | self",
+  "tags": ["lang:bn", "ai:on", "subject:সরস্বতী দেবী", "dob:1938-04-14"]
+}
+```
+
+Response must return the created capsule with its `id`; the UI then routes to `/capsules/:id`.
+
+## Assets
+
+The hero logo is served from `public/image.png` and referenced as `/image.png`
+(no CDN asset pointer). Replace that file to change the logo.
+
+## Endpoints still needed / to confirm
+
+1. `POST /api/capsules` — accept `privacy`, `relation`, `tags` (the wizard sends
+   subject name, date of birth, capsule language and the AI-chat flag as tags today).
+   If you prefer first-class fields (`subjectName`, `subjectDob`, `language`,
+   `aiChatEnabled`), expose them and I will switch the payload.
+2. `POST /api/capsules/:id/cover` (multipart `file`) — cover-image upload; the wizard's
+   cover box is a placeholder until this exists.
+3. `GET /api/memories/search` — include `capsuleId` on every hit so results can deep-link.
+4. `GET /api/settings/notifications` — confirm the emitted `type` values
+   (`vault | letter | ai | upload | share | error`).
+5. Optional (UI ready, currently local-only): chat SSE streaming
+   (`POST /api/capsules/:id/chat/stream`), memory version history, duplicate detection,
+   and search filters by media type / emotion / date range.
+
+
 
 ## Built with
 

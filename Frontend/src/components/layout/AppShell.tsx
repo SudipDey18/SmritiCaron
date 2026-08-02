@@ -2,11 +2,14 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import {
   Archive,
+  Bell,
   Clock,
+  History as HistoryIcon,
   Home,
   Image,
   MessageCircleHeart,
   ScrollText,
+  Search,
   Settings,
   Sparkles,
   TreeDeciduous,
@@ -16,6 +19,10 @@ import {
 
 import alpona from "@/assets/alpona-pattern.jpg";
 import { LanguageToggle } from "@/components/LanguageToggle";
+import { NotificationCenter } from "@/components/common/NotificationCenter";
+import { SearchModal, useCommandPalette } from "@/components/common/SearchModal";
+import { mediaUrl } from "@/lib/api/client";
+import { useAuth } from "@/lib/auth";
 import { useLang, type Key } from "@/lib/i18n";
 
 const CAPSULE = "dida";
@@ -38,9 +45,12 @@ const capsuleNav: NavItem[] = [
 ];
 
 const accountNav: NavItem[] = [
+  { to: "/activity", key: "activityLog", icon: HistoryIcon },
+  { to: "/notifications", key: "notifications", icon: Bell },
   { to: "/profile", key: "profile", icon: UserRound },
   { to: "/settings", key: "settings", icon: Settings },
 ];
+
 
 function NavLinks({ items, id }: { items: NavItem[]; id: string }) {
   const { t } = useLang();
@@ -71,7 +81,11 @@ export function AppShell({ children }: { children: ReactNode }) {
   const params = useRouterState({
     select: (s) => s.matches.at(-1)?.params as { id?: string } | undefined,
   });
-  const id = params?.id ?? CAPSULE;
+  const id = params?.id || CAPSULE;
+  const { open: palette, setOpen: setPalette } = useCommandPalette();
+  const { user, signOut } = useAuth();
+  const avatarUrl = user && "avatarUrl" in user ? mediaUrl(user.avatarUrl) : undefined;
+  const initial = user?.name?.charAt(0) || "অ";
 
   return (
     <div className="min-h-screen bg-background paper-grain">
@@ -98,8 +112,15 @@ export function AppShell({ children }: { children: ReactNode }) {
             </div>
             <NavLinks items={accountNav} id={id} />
           </nav>
-          <div className="mt-6">
+          <div className="mt-6 space-y-3">
             <LanguageToggle />
+            <button
+              type="button"
+              onClick={() => void signOut()}
+              className="w-full rounded-md border border-border px-3 py-2 text-left text-sm text-muted-foreground transition hover:border-destructive/50 hover:text-destructive"
+            >
+              {t("signOut")}
+            </button>
           </div>
         </aside>
 
@@ -108,22 +129,44 @@ export function AppShell({ children }: { children: ReactNode }) {
             <Link to="/" className="font-display text-xl text-primary lg:hidden">
               {t("brand")}
             </Link>
-            <p className="hidden text-sm text-muted-foreground lg:block">
-              {t("footerNote")}
-            </p>
+            <button
+              type="button"
+              onClick={() => setPalette(true)}
+              className="hidden min-w-64 items-center gap-3 rounded-full border border-border bg-card/70 px-4 py-2 text-sm text-muted-foreground transition hover:border-primary/45 hover:text-foreground lg:flex"
+            >
+              <Search className="size-4" aria-hidden />
+              <span className="flex-1 text-left">{t("search")}</span>
+              <kbd className="rounded border border-border px-1.5 py-0.5 text-[10px]">⌘K</kbd>
+            </button>
             <div className="flex items-center gap-3">
+              <button
+                type="button"
+                aria-label={t("search")}
+                onClick={() => setPalette(true)}
+                className="grid size-9 place-items-center rounded-full border border-border text-muted-foreground transition hover:border-primary/50 hover:text-primary lg:hidden"
+              >
+                <Search className="size-4" aria-hidden />
+              </button>
+              <NotificationCenter />
               <LanguageToggle compact />
               <Link
                 to="/profile"
-                className="grid size-9 place-items-center rounded-full bg-primary/10 font-display text-sm text-primary ring-1 ring-primary/25 transition hover:ring-primary"
+                className="grid size-9 place-items-center overflow-hidden rounded-full bg-primary/10 font-display text-sm text-primary ring-1 ring-primary/25 transition hover:ring-primary"
               >
-                অ
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt={user?.name ?? ""} className="size-full object-cover" />
+                ) : (
+                  initial
+                )}
               </Link>
             </div>
           </header>
           <main className="px-4 pb-28 pt-6 lg:px-8 lg:pb-14">{children}</main>
         </div>
       </div>
+
+      <SearchModal open={palette} onClose={() => setPalette(false)} />
+
 
       <nav className="fixed bottom-0 left-0 right-0 z-30 flex items-center justify-around border-t border-border bg-card/95 px-2 py-2 backdrop-blur lg:hidden">
         {[primaryNav[0], capsuleNav[0], capsuleNav[2], capsuleNav[3], accountNav[1]].map(
